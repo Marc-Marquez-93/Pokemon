@@ -6,6 +6,34 @@ import Swal from "sweetalert2";
 let pok = ref("".toLowerCase());
 let resultado = ref("");
 let imagensrc = ref("");
+let tipos = ref([]);
+
+async function cargarTipos() {
+  try {
+    const res = await axios.get("https://pokeapi.co/api/v2/type");
+    const listaTipos = res.data.results;
+
+    const promesas = listaTipos.map(async (tipo, index) => {
+      const detalle = await axios.get(tipo.url);
+
+      return {
+        tipo: detalle.data.id,
+        debilidades: detalle.data.damage_relations.double_damage_from,
+      };
+    });
+
+    tipos.value = await Promise.all(promesas);
+
+    console.log("Tipos con debilidades:", tipos.value);
+  } catch (err) {
+    console.error("Error cargando tipos:", err);
+    Swal.fire({
+      icon: "error",
+      title: "Oops...",
+      text: "No se pudieron cargar los tipos 😢",
+    });
+  }
+}
 
 const coloresTipo = {
   normal: "#A8A77A",
@@ -27,6 +55,26 @@ const coloresTipo = {
   steel: "#B7B7CE",
   fairy: "#D685AD",
 };
+
+cargarTipos();
+
+function obtenerDebilidades(pokemon) {
+  if (!pokemon.types) return [];
+
+  let debs = [];
+
+  pokemon.types.forEach((t) => {
+    const tipoId = parseInt(t.type.url.split("/").slice(-2)[0]);
+
+    const tipoEncontrado = tipos.value.find((x) => x.tipo === tipoId);
+
+    if (tipoEncontrado) {
+      debs.push(...tipoEncontrado.debilidades.map((d) => d.name));
+    }
+  });
+
+  return [...new Set(debs)];
+}
 
 function buscar() {
   if (pok.value == "") {
@@ -68,6 +116,19 @@ function buscar() {
       imagensrc.value = "";
     });
 }
+
+function obtenerGradiente(pokemon) {
+  if (!pokemon.types) return "#fff";
+
+  const colores = pokemon.types.map((t) => coloresTipo[t.type.name]);
+
+  if (colores.length === 1) {
+    return colores[0]; // un solo color
+  }
+
+  // si hay 2 o más tipos, hacemos un degradado
+  return `linear-gradient(135deg, ${colores.join(", ")})`;
+}
 </script>
 
 
@@ -88,17 +149,74 @@ function buscar() {
       />
       <button @click="buscar" class="bt">buscar</button>
     </div>
-    <div id="card" v-if="resultado">
-      <div id="estadisticas"></div>
+    <div
+      id="card"
+      v-if="resultado && resultado"
+      :style="{ background: obtenerGradiente(resultado) }"
+    >
+      <div id="estadisticas">
+        <div class="es1">
+          <h3>Estadísticas</h3>
+          <div v-for="stat in resultado.stats" :key="stat.stat.name">
+            <p>
+              {{ stat.stat.name.toUpperCase() }}:
+              {{ `${stat.base_stat}/${255}` }}
+            </p>
+            <div class="barra">
+              <div
+                class="progreso"
+                :style="{
+                  width: (stat.base_stat / 255) * 100 + '%',
+                  background: obtenerGradiente(resultado),
+                }"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="nombre">
-        <div style="position: relative;">
-          <h2 style="position: relative; top: 50%;">{{ resultado.name.toUpperCase() }}</h2>
+        <div style="position: relative">
+          <h2 style="position: relative; top: 50%">
+            {{ resultado.name.toUpperCase() }}
+          </h2>
         </div>
         <div>
           <img :src="imagensrc" alt="imagen" />
         </div>
       </div>
-      <div id="datos"></div>
+
+      <div id="datos">
+        <div class="data">
+          <h3>altura: {{ `${resultado.height} metros` }}</h3>
+          <h3>peso: {{ ` ${resultado.weight} kilogramos ` }}</h3>
+        </div>
+        <div class="data">
+          <h3>Tipos:</h3>
+          <span
+            v-for="tipo in resultado.types"
+            :key="tipo.type.name"
+            :style="{ backgroundColor: coloresTipo[tipo.type.name] }"
+            class="tipo"
+          >
+            {{ tipo.type.name.toUpperCase() }}
+          </span>
+        </div>
+
+        <div class="data">
+          <h3>Debilidades:</h3>
+          <div>
+            <span
+              v-for="d in obtenerDebilidades(resultado)"
+              :key="d"
+              :style="{ backgroundColor: coloresTipo[d] }"
+              class="tipo"
+            >
+              {{ d.toUpperCase() }}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-else></div>
@@ -191,4 +309,152 @@ function buscar() {
   width: 200px;
   height: 200px;
 }
+
+#estadisticas {
+  display: grid;
+  justify-items: center;
+  align-items: center;
+}
+
+.es1 {
+  padding: 10px;
+  border: #000000 solid 2px;
+  border-radius: 8px;
+  background-color: #ffcb05;
+  min-width: 290px;
+  width: 90%;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.barra {
+  height: 15px;
+  width: 100%;
+  border-radius: 12px;
+  background-color: #ffcb05;
+  border: solid 1px #000000;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+#datos {
+  margin: 25px 0;
+  display: grid;
+  justify-items: center;
+  align-items: center;
+}
+.data {
+  border: #000000 solid 1px;
+  border-radius: 8px;
+  background-color: #ffcb05;
+  min-width: 290px;
+  width: 90%;
+  gap: 5px;
+  cursor: pointer;
+  padding: 10px;
+  text-align: center;
+  height: 60%;
+}
+
+.progreso {
+  height: 100%;
+  background-color: #3b4cca;
+  transition: width 1s ease;
+}
+
+.tipo {
+  padding: 5px 10px;
+  border-radius: 12px;
+  color: white;
+  margin: 5px;
+  font-weight: bold;
+  display: inline-block;
+  cursor: pointer;
+}
+
+/* 📱 Responsividad total desde 1000px hacia abajo */
+@media (max-width: 1000px) {
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: rgb(235, 238, 241); /* mismo fondo */
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  #container {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    background-color: rgb(235, 238, 241); /* mantiene el color */
+    padding: 20px;
+  }
+
+  /* Card en una sola columna */
+  #card {
+    grid-template-columns: 1fr;
+    width: 95%;
+    min-height: auto;
+    padding: 15px;
+  }
+
+  #estadisticas,
+  #nombre,
+  #datos {
+    width: 100%;
+    margin-bottom: 20px;
+  }
+
+  #nombre img {
+    width: 160px;
+    height: 160px;
+  }
+
+  /* Cajas más compactas */
+  .es1,
+  .data {
+    max-width: 250px;
+    width: 100%;
+    padding: 8px;
+    margin: 10px 0;
+    background-color: #f2f2f2;
+    border: 1px solid #000;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  /* Input y botón uno debajo del otro */
+  .div {
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+  }
+
+  #input {
+    width: 90%;
+    font-size: 18px; /* legible */
+  }
+
+  .bt {
+    width: 90%;
+    font-size: 18px;
+  }
+
+  /* Texto legible */
+  h2, h3, p {
+    font-size: 18px;
+  }
+
+  /* Spans uno debajo del otro */
+  .tipo {
+    display: block;
+    margin: 5px auto;
+    width: fit-content;
+  }
+}
+
 </style>
