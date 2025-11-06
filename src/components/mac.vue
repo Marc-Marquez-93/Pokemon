@@ -89,12 +89,19 @@ function buscar() {
       <button @click="buscar" class="bt">buscar</button>
     </div>
     <div id="card" v-if="resultado">
-      <h2>{{ resultado.name.toUpperCase() }}</h2>
-      <img :src="imagensrc" alt="imagen" />
+      <div id="estadisticas"></div>
+      <div id="nombre">
+        <div style="position: relative;">
+          <h2 style="position: relative; top: 50%;">{{ resultado.name.toUpperCase() }}</h2>
+        </div>
+        <div>
+          <img :src="imagensrc" alt="imagen" />
+        </div>
+      </div>
+      <div id="datos"></div>
     </div>
 
-    <div v-else>
-</div>
+    <div v-else></div>
   </div>
 </template> 
 
@@ -159,9 +166,29 @@ function buscar() {
   outline: none;
   background-color: #cc0000;
 }
-#card img {
+
+#card {
+  margin-top: 20px;
+  min-width: 300px;
+  width: 80%;
+  min-height: 450px;
+  border: solid 2px #000000;
+  border-radius: 8px;
+  background-color: #ffffff;
+  display: grid;
+  justify-items: center;
+  grid-template-columns: 2fr 1fr 2fr;
+  gap: 10px;
+}
+
+#nombre {
+  display: grid;
+  justify-items: center;
+  position: relative;
+}
+
+#nombre img {
   width: 200px;
   height: 200px;
-  object-fit: contain;
 }
 </style>
