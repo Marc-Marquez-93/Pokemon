@@ -1,39 +1,13 @@
 <script setup>
-import { ref } from "vue";
+import { ref, nextTick } from "vue";
 import axios from "axios";
 import Swal from "sweetalert2";
+import { gsap } from "gsap";
 
-let pok = ref("".toLowerCase());
-let resultado = ref("");
+let pok = ref("");
+let resultado = ref(null);
 let imagensrc = ref("");
 let tipos = ref([]);
-
-async function cargarTipos() {
-  try {
-    const res = await axios.get("https://pokeapi.co/api/v2/type");
-    const listaTipos = res.data.results;
-
-    const promesas = listaTipos.map(async (tipo, index) => {
-      const detalle = await axios.get(tipo.url);
-
-      return {
-        tipo: detalle.data.id,
-        debilidades: detalle.data.damage_relations.double_damage_from,
-      };
-    });
-
-    tipos.value = await Promise.all(promesas);
-
-    console.log("Tipos con debilidades:", tipos.value);
-  } catch (err) {
-    console.error("Error cargando tipos:", err);
-    Swal.fire({
-      icon: "error",
-      title: "Oops...",
-      text: "No se pudieron cargar los tipos 😢",
-    });
-  }
-}
 
 const coloresTipo = {
   normal: "#A8A77A",
@@ -56,80 +30,128 @@ const coloresTipo = {
   fairy: "#D685AD",
 };
 
+async function cargarTipos() {
+  try {
+    const res = await axios.get("https://pokeapi.co/api/v2/type");
+    const promesas = res.data.results.map(async tipo => {
+      const det = await axios.get(tipo.url);
+      return {
+        tipo: det.data.id,
+        debilidades: det.data.damage_relations.double_damage_from.map(d => d.name)
+      };
+    });
+    tipos.value = await Promise.all(promesas);
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: "Oops...",
+      text: "No se pudieron cargar los tipos 😢",
+    });
+  }
+}
 cargarTipos();
 
 function obtenerDebilidades(pokemon) {
   if (!pokemon.types) return [];
-
   let debs = [];
-
-  pokemon.types.forEach((t) => {
+  pokemon.types.forEach(t => {
     const tipoId = parseInt(t.type.url.split("/").slice(-2)[0]);
-
-    const tipoEncontrado = tipos.value.find((x) => x.tipo === tipoId);
-
-    if (tipoEncontrado) {
-      debs.push(...tipoEncontrado.debilidades.map((d) => d.name));
-    }
+    const tipoEncontrado = tipos.value.find(x => x.tipo === tipoId);
+    if (tipoEncontrado) debs.push(...tipoEncontrado.debilidades);
   });
-
   return [...new Set(debs)];
-}
-
-function buscar() {
-  if (pok.value == "") {
-    Swal.fire({
-      icon: "error",
-      title: "Oops...",
-      text: "Por favor ingresa el nombre o codigo de un Pokémon valido!",
-    });
-    return;
-  }
-  let config = {
-    method: "get",
-    maxBodyLength: Infinity,
-    url: `https://pokeapi.co/api/v2/pokemon/${pok.value}`,
-    headers: {},
-  };
-
-  axios
-    .request(config)
-    .then((response) => {
-      resultado.value = response.data;
-
-      imagensrc.value =
-        resultado.value.sprites.other.dream_world.front_default ||
-        resultado.value.sprites.other["official-artwork"].front_default ||
-        resultado.value.sprites.front_default;
-
-      console.log(resultado.value);
-    })
-    .catch((error) => {
-      console.log("Pokémon no encontrado 😢", error);
-      Swal.fire({
-        icon: "error",
-        title: "Oops...",
-        text: "Pokémon no encontrado 😢",
-      });
-      pok.value = "";
-      resultado.value = "";
-      imagensrc.value = "";
-    });
 }
 
 function obtenerGradiente(pokemon) {
   if (!pokemon.types) return "#fff";
+  const colores = pokemon.types.map(t => coloresTipo[t.type.name]);
+  return colores.length === 1
+    ? colores[0]
+    : `linear-gradient(135deg, ${colores.join(", ")})`;
+}
 
-  const colores = pokemon.types.map((t) => coloresTipo[t.type.name]);
-
-  if (colores.length === 1) {
-    return colores[0]; // un solo color
+async function buscar() {
+  if (!pok.value.trim()) {
+    Swal.fire({
+      icon: "error",
+      title: "Oops...",
+      text: "Por favor ingresa el nombre o código de un Pokémon válido!",
+    });
+    return;
   }
 
-  // si hay 2 o más tipos, hacemos un degradado
-  return `linear-gradient(135deg, ${colores.join(", ")})`;
+  try {
+    const res = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pok.value.toLowerCase()}`);
+    resultado.value = res.data;
+
+    imagensrc.value =
+      resultado.value.sprites.other.dream_world.front_default ||
+      resultado.value.sprites.other["official-artwork"].front_default ||
+      resultado.value.sprites.front_default;
+
+    await nextTick(); // esperar a que la card y todos los elementos estén en el DOM
+
+    const tl = gsap.timeline();
+
+    // 1️⃣ Entrada de la card
+    tl.from("#card", {
+      opacity: 0,
+      y: -50,
+      duration: 0.6,
+      ease: "power2.out"
+    });
+
+    // 2️⃣ Nombre y ID con fade y leve movimiento vertical
+    tl.from("#nombre h2", {
+      opacity: 0,
+      y: -20,
+      duration: 0.5,
+      ease: "power2.out"
+    }, "-=0.3");
+
+    tl.from("#nombre .idd", {
+      opacity: 0,
+      y: 20,
+      duration: 0.5,
+      ease: "power2.out"
+    }, "-=0.4");
+
+    // 3️⃣ Imagen Pokémon animación circular más grande
+    tl.to("#nombre img", {
+      x: 20,      // antes era 10, ahora el doble
+      y: 10,      // antes era 5, ahora el doble
+      rotation: 6, // antes 3
+      duration: 1.5,
+      yoyo: true,
+      repeat: -1,
+      ease: "sine.inOut"
+    }, "-=0.3");
+
+    // 4️⃣ Animación de pulso unificada para tabla de estadísticas y los div.data
+    const elementosPulso = [".es1", "#datos .data"]; // ambos van a usar la misma animación
+
+    tl.to(elementosPulso, {
+      scale: 1.05,      // mismo tamaño máximo que antes
+      duration: 0.8,    // misma duración
+      yoyo: true,
+      repeat: -1,
+      ease: "sine.inOut",
+      stagger: 0.2      // desfasado para que no pulse todo a la vez
+    }, "-=1"); // overlap con animación anterior
+
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: "Oops...",
+      text: "Pokémon no encontrado 😢",
+    });
+    pok.value = "";
+    resultado.value = null;
+    imagensrc.value = "";
+  }
 }
 </script>
+
 
 
 <template>
