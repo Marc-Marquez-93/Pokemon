@@ -70,7 +70,8 @@ function obtenerGradiente(pokemon) {
     : `linear-gradient(135deg, ${colores.join(", ")})`;
 }
 
-async function buscar() {
+// 🟡 Nueva función: recargar la página y luego pintar
+function buscar() {
   if (!pok.value.trim()) {
     Swal.fire({
       icon: "error",
@@ -79,6 +80,19 @@ async function buscar() {
     });
     return;
   }
+
+  // Guardar el valor del input antes de recargar
+  localStorage.setItem("ultimoPokemon", pok.value);
+  location.reload();
+}
+
+// 🟢 Cuando la página se recarga, ejecuta la búsqueda automáticamente
+window.addEventListener("load", async () => {
+  const ultimo = localStorage.getItem("ultimoPokemon");
+  if (!ultimo) return;
+
+  pok.value = ultimo;
+  localStorage.removeItem("ultimoPokemon");
 
   try {
     const res = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pok.value.toLowerCase()}`);
@@ -89,56 +103,31 @@ async function buscar() {
       resultado.value.sprites.other["official-artwork"].front_default ||
       resultado.value.sprites.front_default;
 
-    await nextTick(); // esperar a que la card y todos los elementos estén en el DOM
+    await nextTick();
 
     const tl = gsap.timeline();
-
-    // 1️⃣ Entrada de la card
-    tl.from("#card", {
-      opacity: 0,
-      y: -50,
-      duration: 0.6,
-      ease: "power2.out"
-    });
-
-    // 2️⃣ Nombre y ID con fade y leve movimiento vertical
-    tl.from("#nombre h2", {
-      opacity: 0,
-      y: -20,
-      duration: 0.5,
-      ease: "power2.out"
-    }, "-=0.3");
-
-    tl.from("#nombre .idd", {
-      opacity: 0,
-      y: 20,
-      duration: 0.5,
-      ease: "power2.out"
-    }, "-=0.4");
-
-    // 3️⃣ Imagen Pokémon animación circular más grande
+    tl.from("#card", { opacity: 0, y: -50, duration: 0.6, ease: "power2.out" });
+    tl.from("#nombre h2", { opacity: 0, y: -20, duration: 0.5, ease: "power2.out" }, "-=0.3");
+    tl.from("#nombre .idd", { opacity: 0, y: 20, duration: 0.5, ease: "power2.out" }, "-=0.4");
     tl.to("#nombre img", {
-      x: 20,      // antes era 10, ahora el doble
-      y: 10,      // antes era 5, ahora el doble
-      rotation: 6, // antes 3
+      x: 20,
+      y: 10,
+      rotation: 6,
       duration: 1.5,
       yoyo: true,
       repeat: -1,
       ease: "sine.inOut"
     }, "-=0.3");
 
-    // 4️⃣ Animación de pulso unificada para tabla de estadísticas y los div.data
-    const elementosPulso = [".es1", "#datos .data"]; // ambos van a usar la misma animación
-
+    const elementosPulso = [".es1", "#datos .data"];
     tl.to(elementosPulso, {
-      scale: 1.05,      // mismo tamaño máximo que antes
-      duration: 0.8,    // misma duración
+      scale: 1.05,
+      duration: 0.8,
       yoyo: true,
       repeat: -1,
       ease: "sine.inOut",
-      stagger: 0.2      // desfasado para que no pulse todo a la vez
-    }, "-=1"); // overlap con animación anterior
-
+      stagger: 0.2
+    }, "-=1");
   } catch (err) {
     Swal.fire({
       icon: "error",
@@ -149,8 +138,9 @@ async function buscar() {
     resultado.value = null;
     imagensrc.value = "";
   }
-}
+});
 </script>
+
 
 
 
