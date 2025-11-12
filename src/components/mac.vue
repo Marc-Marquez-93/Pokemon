@@ -319,6 +319,7 @@ async function buscar() {
   justify-items: center;
   grid-template-columns: 2fr 1fr 2fr;
   gap: 10px;
+  cursor:pointer;
 }
 
 #nombre {
